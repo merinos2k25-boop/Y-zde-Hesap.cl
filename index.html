@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Yüzde Hesapla</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14213d" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1322" media="(prefers-color-scheme: dark)">
+<meta name="description" content="TL tutarının yüzdesini hızlıca hesapla.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314213d'/><text x='50' y='68' font-size='58' font-weight='700' text-anchor='middle' fill='%23f2a900' font-family='Arial'>%25</text></svg>">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --ink: #14213d;
+  --muted: #5d6b85;
+  --line: #d5dbe7;
+  --key: #ffffff;
+  --key-press: #e1e6f0;
+  --accent: #f2a900;
+  --accent-ink: #14213d;
+  --accent-press: #d99800;
+  --danger: #c0392b;
+  --disabled-bg: #cfd5e2;
+  --disabled-ink: #7d889e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0c1322;
+    --surface: #152036;
+    --ink: #eef1f8;
+    --muted: #93a1bd;
+    --line: #26344f;
+    --key: #1a2742;
+    --key-press: #243556;
+    --accent: #f2a900;
+    --accent-ink: #14213d;
+    --accent-press: #ffbd2e;
+    --danger: #ff7b6b;
+    --disabled-bg: #26344f;
+    --disabled-ink: #6c7a97;
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button { font: inherit; color: inherit; touch-action: manipulation; }
+
+.app {
+  height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.back {
+  width: 44px; height: 44px;
+  border: 0; border-radius: 50%;
+  background: var(--surface);
+  display: grid; place-items: center;
+  cursor: pointer;
+  visibility: hidden;
+}
+.back.on { visibility: visible; }
+.back:active { background: var(--key-press); }
+.back svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.title { font-size: 17px; font-weight: 650; flex: 1; }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.dots i.on { background: var(--accent); }
+
+.screen { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.screen.active { display: flex; }
+
+/* Display */
+.display {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 8px 4px 20px;
+}
+.label { color: var(--muted); font-size: 15px; margin-bottom: 6px; }
+.big {
+  display: flex; align-items: baseline; gap: 8px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.big .val { font-size: 56px; }
+.big .unit { font-size: 28px; color: var(--accent); font-weight: 700; }
+.big.fit-1 .val { font-size: 46px; }
+.big.fit-2 .val { font-size: 38px; }
+.big.fit-3 .val { font-size: 31px; }
+.big.empty .val { color: var(--muted); opacity: .5; }
+.hint { min-height: 20px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.hint.err { color: var(--danger); }
+
+.chips { display: flex; gap: 8px; margin-bottom: 12px; }
+.chip {
+  flex: 1; height: 40px;
+  border: 1px solid var(--line); border-radius: 20px;
+  background: transparent; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.chip:active { background: var(--key-press); }
+
+/* Keypad */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.key {
+  height: clamp(52px, 8.4dvh, 66px);
+  border: 0; border-radius: 16px;
+  background: var(--key);
+  font-size: 26px; font-weight: 600;
+  cursor: pointer;
+  display: grid; place-items: center;
+  box-shadow: 0 1px 0 var(--line);
+}
+.key:active { background: var(--key-press); }
+.key.fn { color: var(--muted); }
+.key svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.key[disabled] { opacity: .35; cursor: default; }
+
+.cta {
+  margin-top: 12px;
+  height: 58px;
+  border: 0; border-radius: 16px;
+  background: var(--accent); color: var(--accent-ink);
+  font-size: 18px; font-weight: 700;
+  cursor: pointer;
+}
+.cta:active { background: var(--accent-press); }
+.cta[disabled] { background: var(--disabled-bg); color: var(--disabled-ink); cursor: default; }
+.cta.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); height: 52px; font-size: 16px; font-weight: 600; margin-top: 10px; }
+.cta.ghost:active { background: var(--key-press); }
+
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+.shake { animation: shake .25s; }
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
+
+/* Result */
+.result { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+.summary { color: var(--muted); font-size: 15px; padding: 0 4px; }
+.summary b { color: var(--ink); font-weight: 650; }
+.hero {
+  background: var(--ink); color: var(--bg);
+  border-radius: 22px; padding: 22px 20px;
+}
+@media (prefers-color-scheme: dark) { .hero { background: var(--accent); color: var(--accent-ink); } }
+.hero .label { color: inherit; opacity: .7; }
+.hero .num { font-size: 44px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; word-break: break-all; }
+.hero.fit-1 .num { font-size: 36px; }
+.hero.fit-2 .num { font-size: 29px; }
+.rows { background: var(--surface); border-radius: 18px; overflow: hidden; }
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 18px; width: 100%;
+  border: 0; background: transparent; text-align: left; cursor: pointer;
+}
+.row + .row { border-top: 1px solid var(--line); }
+.row:active { background: var(--key-press); }
+.row .k { color: var(--muted); font-size: 15px; }
+.row .v { font-size: 19px; font-weight: 650; text-align: right; word-break: break-all; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 90px);
+  transform: translateX(-50%) translateY(10px);
+  background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 20px; font-size: 14px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+}
+@media (prefers-color-scheme: dark) { .toast { background: var(--surface); color: var(--ink); border: 1px solid var(--line); } }
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-height: 640px) {
+  .big .val { font-size: 44px; }
+  .big.fit-1 .val { font-size: 38px; }
+  .big.fit-2 .val { font-size: 32px; }
+  .big.fit-3 .val { font-size: 27px; }
+  .key { height: 48px; font-size: 22px; }
+}
+
+/* ---------- Dokunma ve geçiş efektleri ---------- */
+.key, .cta, .chip, .row, .back {
+  position: relative;
+  overflow: hidden;
+  transition: transform .12s ease, background-color .15s ease, border-color .2s ease, opacity .2s ease;
+  will-change: transform;
+}
+.key:active { transform: scale(.93); }
+.cta:not([disabled]):active { transform: scale(.97); }
+.chip:active { transform: scale(.93); }
+.row:active { transform: scale(.985); }
+.back:active { transform: scale(.9); }
+.big .val { display: inline-block; transform-origin: left bottom; }
+.dots i { transition: background-color .3s ease, transform .3s ease; }
+.dots i.on { transform: scale(1.3); }
+.chip.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.row.flash { background: var(--key-press); }
+.screen { will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) {
+  .key, .cta, .chip, .row, .back, .dots i, .toast { transition: none; }
+}
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <header class="top">
+    <button class="back" id="back" type="button" aria-label="Geri">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="title" id="title">Tutar</div>
+    <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+  </header>
+
+  <!-- 1. Tutar -->
+  <section class="screen active" id="s1" aria-label="Tutar girişi">
+    <div class="display">
+      <div class="label">Tutar</div>
+      <div class="big empty" id="amtBig"><span class="val" id="amtVal">0</span><span class="unit">₺</span></div>
+      <div class="hint" id="amtHint" aria-live="polite"></div>
+    </div>
+    <div class="pad" id="padAmt">
+      <button class="key" data-k="1" type="button">1</button>
+      <button class="key" data-k="2" type="button">2</button>
+      <button class="key" data-k="3" type="button">3</button>
+      <button class="key" data-k="4" type="button">4</button>
+      <button class="key" data-k="5" type="button">5</button>
+      <button class="key" data-k="6" type="button">6</button>
+      <button class="key" data-k="7" type="button">7</button>
+      <button class="key" data-k="8" type="button">8</button>
+      <button class="key" data-k="9" type="button">9</button>
+      <button class="key fn" data-k="," type="button" aria-label="Virgül">,</button>
+      <button class="key" data-k="0" type="button">0</button>
+      <button class="key fn" data-k="del" type="button" aria-label="Sil">
+        <svg viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="M17 9.5l-5 5M12 9.5l5 5"/></svg>
+      </button>
+    </div>
+    <button class="cta" id="toS2" type="button" disabled>Devam</button>
+  </section>
+
+  <!-- 2. Yüzde -->
+  <section class="screen" id="s2" aria-label="Yüzde girişi">
+    <div class="display">
+      <div class="label">Yüzde (1 – 100)</div>
+      <div class="big empty" id="pctBig"><span class="val" id="pctVal">0</span><span class="unit">%</span></div>
+      <div class="hint" id="pctHint" aria-live="polite"></div>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip" data-p="1" type="button">1</button>
+      <button class="chip" data-p="10" type="button">10</button>
+      <button class="chip" data-p="18" type="button">18</button>
+      <button class="chip" data-p="20" type="button">20</button>
+      <button class="chip" data-p="50" type="button">50</button>
+    </div>
+    <div class="pad" id="padPct">
+      <button class="key" data-k="1" type="button">1</button>
+      <button class="key" data-k="2" type="button">2</button>
+      <button class="key" data-k="3" type="button">3</button>
+      <button class="key" data-k="4" type="button">4</button>
+      <button class="key" data-k="5" type="button">5</button>
+      <button class="key" data-k="6" type="button">6</button>
+      <button class="key" data-k="7" type="button">7</button>
+      <button class="key" data-k="8" type="button">8</button>
+      <button class="key" data-k="9" type="button">9</button>
+      <button class="key fn" data-k="clr" type="button" aria-label="Temizle">C</button>
+      <button class="key" data-k="0" type="button">0</button>
+      <button class="key fn" data-k="del" type="button" aria-label="Sil">
+        <svg viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="M17 9.5l-5 5M12 9.5l5 5"/></svg>
+      </button>
+    </div>
+    <button class="cta" id="toS3" type="button" disabled>Hesapla</button>
+  </section>
+
+  <!-- 3. Sonuç -->
+  <section class="screen" id="s3" aria-label="Sonuç">
+    <div class="result">
+      <div class="summary" id="sumTxt"></div>
+      <div class="hero" id="hero">
+        <div class="label" id="heroLbl"></div>
+        <div class="num" id="heroNum"></div>
+      </div>
+      <div class="rows">
+        <button class="row" type="button" data-copy="plus">
+          <span class="k">Tutar + yüzde</span><span class="v" id="rPlus"></span>
+        </button>
+        <button class="row" type="button" data-copy="minus">
+          <span class="k">Tutar − yüzde</span><span class="v" id="rMinus"></span>
+        </button>
+        <button class="row" type="button" data-copy="part">
+          <span class="k">Yüzde tutarı</span><span class="v" id="rPart"></span>
+        </button>
+      </div>
+      <div class="summary">Bir satıra dokunarak değeri kopyalayabilirsin.</div>
+    </div>
+    <button class="cta" id="again" type="button">Yeni hesaplama</button>
+    <button class="cta ghost" id="editPct" type="button">Yüzdeyi değiştir</button>
+  </section>
+
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MAX_INT_DIGITS = 10;   // 9.999.999.999 TL'ye kadar
+  var MAX_DEC_DIGITS = 2;
+
+  var state = {
+    step: 1,
+    amountStr: "",  // "1234,5" gibi ham metin
+    pctStr: ""      // "18" gibi
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var titles = { 1: "Tutar", 2: "Yüzde", 3: "Sonuç" };
+
+  /* ---------- Yardımcılar ---------- */
+  function groupInt(s) {
+    return s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  }
+  function displayAmount(str) {
+    if (!str) return "0";
+    var parts = str.split(",");
+    var out = groupInt(parts[0] || "0");
+    if (parts.length > 1) out += "," + parts[1];
+    return out;
+  }
+  // Metin -> kuruş (tam sayı). Float hatası olmaz.
+  function toCents(str) {
+    if (!str) return 0;
+    var p = str.split(",");
+    var lira = parseInt(p[0] || "0", 10) || 0;
+    var dec = (p[1] || "");
+    while (dec.length < 2) dec += "0";
+    var kurus = parseInt(dec.slice(0, 2), 10) || 0;
+    return lira * 100 + kurus;
+  }
+  // Kuruş * yüzde / 100, yarım kuruşta yukarı yuvarlama
+  function percentOf(cents, p) {
+    var x = cents * p;
+    var q = Math.floor(x / 100);
+    var r = x - q * 100;
+    if (r >= 50) q += 1;
+    return q;
+  }
+  function fmtCents(c) {
+    var neg = c < 0;
+    if (neg) c = -c;
+    var lira = Math.floor(c / 100);
+    var kurus = c - lira * 100;
+    var s = groupInt(String(lira)) + "," + (kurus < 10 ? "0" : "") + kurus;
+    return (neg ? "-" : "") + s + " ₺";
+  }
+  function fitClass(len) {
+    if (len > 17) return "fit-3";
+    if (len > 13) return "fit-2";
+    if (len > 9) return "fit-1";
+    return "";
+  }
+  function shake(el) {
+    el.classList.remove("shake");
+    void el.offsetWidth;
+    el.classList.add("shake");
+  }
+  function vibrate() {
+    try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) {}
+  }
+
+
+  /* ---------- Efektler ---------- */
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var canAnimate = typeof Element.prototype.animate === "function" && !reduceMotion;
+
+  // Dokunma dalgası (ripple)
+  var RIPPLE_SEL = ".key, .cta, .chip, .row, .back";
+  document.addEventListener("pointerdown", function (e) {
+    if (!canAnimate) return;
+    var el = e.target.closest ? e.target.closest(RIPPLE_SEL) : null;
+    if (!el || el.disabled) return;
+    var r = el.getBoundingClientRect();
+    var size = Math.max(r.width, r.height) * 2;
+    var dot = document.createElement("span");
+    dot.setAttribute("aria-hidden", "true");
+    dot.style.cssText =
+      "position:absolute;pointer-events:none;border-radius:50%;background:currentColor;" +
+      "width:" + size + "px;height:" + size + "px;" +
+      "left:" + (e.clientX - r.left - size / 2) + "px;" +
+      "top:" + (e.clientY - r.top - size / 2) + "px;";
+    el.appendChild(dot);
+    var a = dot.animate(
+      [{ transform: "scale(0)", opacity: 0.22 }, { transform: "scale(1)", opacity: 0 }],
+      { duration: 520, easing: "cubic-bezier(.2,.7,.3,1)" }
+    );
+    var done = function () { if (dot.parentNode) dot.parentNode.removeChild(dot); };
+    a.onfinish = done; a.oncancel = done;
+  }, { passive: true });
+
+  // iOS Safari'de :active için
+  document.addEventListener("touchstart", function () {}, { passive: true });
+
+  // Rakam değişince küçük "pop"
+  function pop(el) {
+    if (!canAnimate || !el) return;
+    el.animate(
+      [{ transform: "scale(1)" }, { transform: "scale(1.07)" }, { transform: "scale(1)" }],
+      { duration: 160, easing: "ease-out" }
+    );
+  }
+
+  // Ekran geçişi: yeni ekran yönüne göre kayarak girer
+  function enter(el, dir) {
+    if (!canAnimate || !dir) return;
+    try {
+      el.getAnimations().forEach(function (a) { a.cancel(); });
+      el.animate(
+        [
+          { opacity: 0, transform: "translateX(" + (dir * 36) + "px) scale(.985)" },
+          { opacity: 1, transform: "translateX(0) scale(1)" }
+        ],
+        { duration: 300, easing: "cubic-bezier(.22,.8,.3,1)" }
+      );
+    } catch (err) {}
+  }
+  function fadeTitle() {
+    if (!canAnimate) return;
+    $("title").animate(
+      [{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "translateY(0)" }],
+      { duration: 240, easing: "ease-out" }
+    );
+  }
+
+  // Sonuç sayısı 0'dan hedefe sayarak açılır
+  var countToken = 0;
+  function countUp(el, target, render) {
+    var token = ++countToken;
+    if (!canAnimate || target <= 0) { el.textContent = render(target); return; }
+    var dur = 650, t0 = null;
+    function frame(ts) {
+      if (token !== countToken) return;          // yeni hesap başladıysa dur
+      if (t0 === null) t0 = ts;
+      var t = Math.min(1, (ts - t0) / dur);
+      var eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = render(t >= 1 ? target : Math.round(target * eased));
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    el.textContent = render(0);
+    requestAnimationFrame(frame);
+  }
+
+  // Sonuç satırları sırayla belirir
+  function stagger(nodes) {
+    if (!canAnimate) return;
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].animate(
+        [{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "translateY(0)" }],
+        { duration: 380, delay: 120 + i * 90, easing: "cubic-bezier(.22,.8,.3,1)", fill: "backwards" }
+      );
+    }
+  }
+
+  /* ---------- Ekran geçişi ---------- */
+  function go(n) {
+    var prev = state.step;
+    var dir = n > prev ? 1 : (n < prev ? -1 : 0);
+    state.step = n;
+    for (var i = 1; i <= 3; i++) {
+      $("s" + i).classList.toggle("active", i === n);
+    }
+    $("title").textContent = titles[n];
+    $("back").classList.toggle("on", n > 1);
+    var dots = document.querySelectorAll(".dots i");
+    for (var d = 0; d < dots.length; d++) dots[d].classList.toggle("on", d < n);
+    if (n === 3) renderResult();
+    if (dir) { enter($("s" + n), dir); fadeTitle(); }
+    if (n === 3 && dir) {
+      stagger([$("sumTxt"), $("hero"), document.querySelector(".rows")]);
+    }
+  }
+
+  /* ---------- Tutar ekranı ---------- */
+  function renderAmount() {
+    var txt = displayAmount(state.amountStr);
+    $("amtVal").textContent = txt;
+    var big = $("amtBig");
+    big.className = "big " + fitClass(txt.length) + (state.amountStr ? "" : " empty");
+    var ok = toCents(state.amountStr) > 0;
+    $("toS2").disabled = !ok;
+    $("amtHint").textContent = "";
+    $("amtHint").classList.remove("err");
+  }
+  function amountKey(k) {
+    var s = state.amountStr;
+    if (k === "del") {
+      state.amountStr = s.slice(0, -1);
+    } else if (k === ",") {
+      if (s.indexOf(",") !== -1) { return reject($("amtBig"), "Tutarda tek virgül olabilir."); }
+      state.amountStr = (s === "" ? "0" : s) + ",";
+    } else {
+      var parts = s.split(",");
+      if (parts.length > 1) {
+        if (parts[1].length >= MAX_DEC_DIGITS) return reject($("amtBig"), "En fazla 2 kuruş hanesi girebilirsin.");
+        state.amountStr = s + k;
+      } else {
+        if (s === "0") {
+          // baştaki sıfırı değiştir
+          state.amountStr = (k === "0") ? "0" : k;
+        } else {
+          if (parts[0].length >= MAX_INT_DIGITS) return reject($("amtBig"), "Tutar çok büyük.");
+          state.amountStr = s + k;
+        }
+      }
+    }
+    vibrate();
+    renderAmount();
+    pop($("amtVal"));
+  }
+  function reject(el, msg) {
+    shake(el);
+    try { if (navigator.vibrate) navigator.vibrate([20, 40, 20]); } catch (e) {}
+    var h = el === $("amtBig") ? $("amtHint") : $("pctHint");
+    h.textContent = msg;
+    h.classList.add("err");
+  }
+
+  /* ---------- Yüzde ekranı ---------- */
+  function pctNum() { return state.pctStr ? parseInt(state.pctStr, 10) : 0; }
+  function renderPct() {
+    var n = pctNum();
+    $("pctVal").textContent = state.pctStr || "0";
+    $("pctBig").className = "big" + (state.pctStr ? "" : " empty");
+    $("toS3").disabled = !(n >= 1 && n <= 100);
+    $("pctHint").textContent = "";
+    $("pctHint").classList.remove("err");
+    var chips = document.querySelectorAll(".chip");
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle("sel", parseInt(chips[i].dataset.p, 10) === n);
+    }
+  }
+  function pctKey(k) {
+    var s = state.pctStr;
+    if (k === "del") {
+      state.pctStr = s.slice(0, -1);
+    } else if (k === "clr") {
+      state.pctStr = "";
+    } else {
+      var next = (s === "0" || s === "") ? k : s + k;
+      if (next === "0") { state.pctStr = ""; return reject($("pctBig"), "Yüzde 1 ile 100 arasında olmalı."); }
+      if (parseInt(next, 10) > 100) return reject($("pctBig"), "Yüzde en fazla 100 olabilir.");
+      state.pctStr = next;
+    }
+    vibrate();
+    renderPct();
+    pop($("pctVal"));
+  }
+
+  /* ---------- Sonuç ekranı ---------- */
+  var computed = null;
+  function renderResult() {
+    var cents = toCents(state.amountStr);
+    var p = pctNum();
+    if (!(cents > 0) || !(p >= 1 && p <= 100)) { go(1); return; }
+    var part = percentOf(cents, p);
+    computed = { part: part, plus: cents + part, minus: cents - part };
+
+    $("sumTxt").innerHTML = "<b>" + fmtCents(cents) + "</b> tutarının <b>%" + p + "</b> değeri";
+    $("heroLbl").textContent = "Yüzde tutarı";
+    var heroTxt = fmtCents(part);
+    countUp($("heroNum"), part, fmtCents);
+    $("hero").className = "hero" + (heroTxt.length > 16 ? " fit-2" : heroTxt.length > 11 ? " fit-1" : "");
+    $("rPlus").textContent = fmtCents(computed.plus);
+    $("rMinus").textContent = fmtCents(computed.minus);
+    $("rPart").textContent = fmtCents(computed.part);
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("on"); }, 1400);
+  }
+  function copyText(text) {
+    var plain = text.replace(/\s?₺/, "");
+    function fallback() {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = plain;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, 99999);
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        toast(ok ? "Kopyalandı" : "Kopyalanamadı");
+      } catch (e) { toast("Kopyalanamadı"); }
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(plain).then(function () { toast("Kopyalandı"); }, fallback);
+    } else { fallback(); }
+  }
+
+  /* ---------- Olaylar ---------- */
+  $("padAmt").addEventListener("click", function (e) {
+    var b = e.target.closest(".key"); if (b) amountKey(b.dataset.k);
+  });
+  $("padPct").addEventListener("click", function (e) {
+    var b = e.target.closest(".key"); if (b) pctKey(b.dataset.k);
+  });
+  $("chips").addEventListener("click", function (e) {
+    var b = e.target.closest(".chip"); if (!b) return;
+    state.pctStr = b.dataset.p; vibrate(); renderPct(); pop($("pctVal"));
+  });
+  $("toS2").addEventListener("click", function () {
+    if (toCents(state.amountStr) > 0) go(2);
+  });
+  $("toS3").addEventListener("click", function () {
+    var n = pctNum(); if (n >= 1 && n <= 100) go(3);
+  });
+  $("back").addEventListener("click", function () {
+    if (state.step > 1) go(state.step - 1);
+  });
+  $("editPct").addEventListener("click", function () { go(2); });
+  $("again").addEventListener("click", function () {
+    state.amountStr = ""; state.pctStr = "";
+    renderAmount(); renderPct(); go(1);
+  });
+  document.querySelector(".rows").addEventListener("click", function (e) {
+    var r = e.target.closest(".row"); if (!r || !computed) return;
+    r.classList.add("flash");
+    setTimeout(function () { r.classList.remove("flash"); }, 260);
+    vibrate();
+    copyText(fmtCents(computed[r.dataset.copy]));
+  });
+
+  // Fiziksel klavye desteği (masaüstü / bluetooth)
+  document.addEventListener("keydown", function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = e.key;
+    if (state.step === 1) {
+      if (/^[0-9]$/.test(k)) amountKey(k);
+      else if (k === "," || k === ".") amountKey(",");
+      else if (k === "Backspace") amountKey("del");
+      else if (k === "Enter" && toCents(state.amountStr) > 0) go(2);
+    } else if (state.step === 2) {
+      if (/^[0-9]$/.test(k)) pctKey(k);
+      else if (k === "Backspace") pctKey("del");
+      else if (k === "Enter") { var n = pctNum(); if (n >= 1 && n <= 100) go(3); }
+    } else if (state.step === 3) {
+      if (k === "Backspace" || k === "Escape") go(2);
+    }
+  });
+
+  renderAmount();
+  renderPct();
+})();
+</script>
+</body>
+</html>
