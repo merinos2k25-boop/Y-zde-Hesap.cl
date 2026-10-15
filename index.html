@@ -88,7 +88,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .back.on { display: grid; }
 .back:active { background: var(--key-press); }
 .back svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.title { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.05; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.title { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.05; flex: 1; min-width: 0; overflow-wrap: anywhere; position: relative; top: 2px; }
 .dots { display: flex; gap: 6px; flex-shrink: 0; }
 .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .dots i.on { background: var(--accent); }
@@ -281,7 +281,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     <button class="back" id="back" type="button" aria-label="Geri">
       <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
     </button>
-    <div class="title" id="title">Tutar</div>
+    <div class="title" id="title">Yüzde Hesaplayıcı</div>
     <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
   </header>
 
