@@ -80,15 +80,16 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   width: 44px; height: 44px;
   border: 0; border-radius: 50%;
   background: var(--surface);
-  display: grid; place-items: center;
+  place-items: center;
   cursor: pointer;
-  visibility: hidden;
+  display: none;
+  flex-shrink: 0;
 }
-.back.on { visibility: visible; }
+.back.on { display: grid; }
 .back:active { background: var(--key-press); }
 .back svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.title { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; flex: 1; min-width: 0; white-space: nowrap; }
-.dots { display: flex; gap: 6px; }
+.title { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.05; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dots { display: flex; gap: 6px; flex-shrink: 0; }
 .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .dots i.on { background: var(--accent); }
 
@@ -230,6 +231,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) {
   .key, .cta, .chip, .row, .back, .dots i, .toast { transition: none; }
 }
+.amt-ref {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  background: var(--surface); border-radius: 14px;
+  padding: 12px 16px; margin-bottom: 18px;
+}
+.amt-ref .k { color: var(--muted); font-size: 15px; flex-shrink: 0; }
+.amt-ref .v { font-size: 22px; font-weight: 700; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 /* Geçmiş: sadece liste kayar, üstteki sonuç sabit */
 .hist-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .hist-wrap[hidden] { display: none; }
@@ -262,6 +270,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .row .k .when { display: block; font-size: 12px; margin-top: 2px; }
 .hist-empty { color: var(--muted); font-size: 14px; padding: 4px; }
 
+@media (max-width: 340px) { .title { font-size: 34px; } }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
@@ -305,16 +314,17 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   <!-- 2. Yüzde -->
   <section class="screen" id="s2" aria-label="Yüzde girişi">
     <div class="display">
+      <div class="amt-ref" id="amtRef"><span class="k">Tutar</span><span class="v" id="amtRefVal">0,00 ₺</span></div>
       <div class="label">Yüzde (1 – 100)</div>
       <div class="big empty" id="pctBig"><span class="val" id="pctVal">0</span><span class="unit">%</span></div>
       <div class="hint" id="pctHint" aria-live="polite"></div>
     </div>
     <div class="chips" id="chips">
-      <button class="chip" data-p="1" type="button">1</button>
+      <button class="chip" data-p="5" type="button">5</button>
       <button class="chip" data-p="10" type="button">10</button>
-      <button class="chip" data-p="18" type="button">18</button>
-      <button class="chip" data-p="20" type="button">20</button>
-      <button class="chip" data-p="50" type="button">50</button>
+      <button class="chip" data-p="15" type="button">15</button>
+      <button class="chip" data-p="25" type="button">25</button>
+      <button class="chip" data-p="35" type="button">35</button>
     </div>
     <div class="pad" id="padPct">
       <button class="key" data-k="1" type="button">1</button>
@@ -384,7 +394,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   };
 
   var $ = function (id) { return document.getElementById(id); };
-  var titles = { 1: "Tutar", 2: "Yüzde", 3: "Sonuç" };
+  var titles = { 1: "Yüzde Hesaplayıcı", 2: "Yüzde", 3: "Sonuç" };
 
   /* ---------- Yardımcılar ---------- */
   function groupInt(s) {
@@ -655,6 +665,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     $("back").classList.toggle("on", n > 1);
     var dots = document.querySelectorAll(".dots i");
     for (var d = 0; d < dots.length; d++) dots[d].classList.toggle("on", d < n);
+    if (n === 2) $("amtRefVal").textContent = fmtCents(toCents(state.amountStr));
     if (n === 3) renderResult();
     if (dir) { enter($("s" + n), dir); fadeTitle(); }
     if (n === 3 && dir) {
