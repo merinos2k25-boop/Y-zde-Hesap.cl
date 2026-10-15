@@ -74,7 +74,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: 48px;
 }
 .back {
   width: 44px; height: 44px;
@@ -87,7 +87,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .back.on { visibility: visible; }
 .back:active { background: var(--key-press); }
 .back svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.title { font-size: 17px; font-weight: 650; flex: 1; }
+.title { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; flex: 1; min-width: 0; white-space: nowrap; }
 .dots { display: flex; gap: 6px; }
 .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .dots i.on { background: var(--accent); }
@@ -168,7 +168,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
 
 /* Result */
-.result { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+.result { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+.result > * { flex-shrink: 0; }
 .summary { color: var(--muted); font-size: 15px; padding: 0 4px; }
 .summary b { color: var(--ink); font-weight: 650; }
 .hero {
@@ -229,6 +230,38 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) {
   .key, .cta, .chip, .row, .back, .dots i, .toast { transition: none; }
 }
+/* Geçmiş: sadece liste kayar, üstteki sonuç sabit */
+.hist-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.hist-wrap[hidden] { display: none; }
+.result > .hist-wrap { flex-shrink: 1; }
+#histList {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+#histList::-webkit-scrollbar { width: 6px; }
+#histList::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+@media (max-height: 720px) {
+  .hero { padding: 14px 18px; }
+  .hero .num { font-size: 34px; }
+  .row { padding: 12px 16px; }
+}
+/* Geçmiş başlık */
+.hist-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 0; }
+.hist-head .t { font-size: 17px; font-weight: 650; }
+.hist-clear {
+  border: 0; background: transparent; color: var(--muted);
+  font-size: 14px; font-weight: 600; padding: 10px 8px; border-radius: 10px; cursor: pointer;
+}
+.hist-clear:active { background: var(--key-press); }
+.row .k .main { display: block; color: var(--ink); font-size: 16px; font-weight: 600; }
+.row .k .when { display: block; font-size: 12px; margin-top: 2px; }
+.hist-empty { color: var(--muted); font-size: 14px; padding: 4px; }
+
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
@@ -310,7 +343,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
         <div class="label" id="heroLbl"></div>
         <div class="num" id="heroNum"></div>
       </div>
-      <div class="rows">
+      <div class="rows" id="resRows">
         <button class="row" type="button" data-copy="plus">
           <span class="k">Tutar + yüzde</span><span class="v" id="rPlus"></span>
         </button>
@@ -322,6 +355,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
         </button>
       </div>
       <div class="summary">Bir satıra dokunarak değeri kopyalayabilirsin.</div>
+      <div class="hist-wrap" id="histWrap" hidden>
+        <div class="hist-head">
+          <span class="t">Geçmiş hesaplamalar</span>
+          <button class="hist-clear" id="histClear" type="button">Temizle</button>
+        </div>
+        <div class="rows" id="histList" style="margin-top:8px"></div>
+      </div>
     </div>
     <button class="cta" id="again" type="button">Yeni hesaplama</button>
     <button class="cta ghost" id="editPct" type="button">Yüzdeyi değiştir</button>
@@ -490,6 +530,119 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }
   }
 
+
+  /* ---------- Tık sesi (tok) ---------- */
+  var audioCtx = null, noiseBuf = null;
+  function getCtx() {
+    if (audioCtx) return audioCtx;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+      // kısa gürültü tamponu (vuruş hissi için)
+      var len = Math.floor(audioCtx.sampleRate * 0.03);
+      noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      var ch = noiseBuf.getChannelData(0);
+      for (var i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    } catch (e) { audioCtx = null; }
+    return audioCtx;
+  }
+  function tick() {
+    var ctx = getCtx();
+    if (!ctx) return;
+    try {
+      if (ctx.state === "suspended") ctx.resume();
+      var t = ctx.currentTime;
+      var master = ctx.createGain();
+      master.gain.value = 0.9;
+      master.connect(ctx.destination);
+
+      // gövde: hızlı alçalan düşük sinüs -> "tok"
+      var osc = ctx.createOscillator();
+      var g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(190, t);
+      osc.frequency.exponentialRampToValueAtTime(58, t + 0.07);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.85, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+      osc.connect(g); g.connect(master);
+      osc.start(t); osc.stop(t + 0.1);
+
+      // ön vuruş: kısık, alçak geçirgen gürültü
+      if (noiseBuf) {
+        var src = ctx.createBufferSource();
+        var lp = ctx.createBiquadFilter();
+        var ng = ctx.createGain();
+        src.buffer = noiseBuf;
+        lp.type = "lowpass"; lp.frequency.value = 900;
+        ng.gain.setValueAtTime(0.35, t);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+        src.connect(lp); lp.connect(ng); ng.connect(master);
+        src.start(t);
+      }
+    } catch (e) {}
+  }
+  document.addEventListener("pointerdown", function (e) {
+    var el = e.target.closest ? e.target.closest(RIPPLE_SEL) : null;
+    if (!el || el.disabled) return;
+    tick();
+  }, { passive: true });
+
+  /* ---------- Geçmiş ---------- */
+  var HIST_KEY = "yuzde_gecmis_v1";
+  var HIST_MAX = 20;
+  var history = [];
+  function loadHistory() {
+    try {
+      var raw = localStorage.getItem(HIST_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) arr = [];
+      history = arr.filter(function (h) {
+        return h && Number.isSafeInteger(h.c) && Number.isSafeInteger(h.p) &&
+               Number.isSafeInteger(h.r) && Number.isFinite(h.t) && h.p >= 1 && h.p <= 100 && h.c > 0;
+      }).slice(0, HIST_MAX);
+    } catch (e) { history = []; }
+  }
+  function saveHistory() {
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(history)); } catch (e) {}
+  }
+  function addHistory(c, p, r) {
+    // aynı hesap art arda tekrarlanırsa tekrar ekleme, en üste al
+    history = history.filter(function (h) { return !(h.c === c && h.p === p); });
+    history.unshift({ c: c, p: p, r: r, t: Date.now() });
+    if (history.length > HIST_MAX) history.length = HIST_MAX;
+    saveHistory();
+  }
+  function fmtWhen(ts) {
+    try {
+      return new Date(ts).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    } catch (e) { return ""; }
+  }
+  function renderHistory() {
+    var past = history.slice(1);               // ilk kayıt şu anki hesap
+    var wrap = $("histWrap"), list = $("histList");
+    list.textContent = "";
+    if (!past.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    past.forEach(function (h, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "row";
+      b.dataset.hist = String(i + 1);
+      var k = document.createElement("span"); k.className = "k";
+      var m = document.createElement("span"); m.className = "main";
+      m.textContent = fmtCents(h.c) + " × %" + h.p;
+      var w = document.createElement("span"); w.className = "when";
+      w.textContent = fmtWhen(h.t);
+      k.appendChild(m); k.appendChild(w);
+      var v = document.createElement("span"); v.className = "v";
+      v.textContent = fmtCents(h.r);
+      b.appendChild(k); b.appendChild(v);
+      list.appendChild(b);
+    });
+  }
+
   /* ---------- Ekran geçişi ---------- */
   function go(n) {
     var prev = state.step;
@@ -505,7 +658,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if (n === 3) renderResult();
     if (dir) { enter($("s" + n), dir); fadeTitle(); }
     if (n === 3 && dir) {
-      stagger([$("sumTxt"), $("hero"), document.querySelector(".rows")]);
+      stagger([$("sumTxt"), $("hero"), $("resRows"), $("histWrap")].filter(function (n) { return n && !n.hidden; }));
     }
   }
 
@@ -593,6 +746,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if (!(cents > 0) || !(p >= 1 && p <= 100)) { go(1); return; }
     var part = percentOf(cents, p);
     computed = { part: part, plus: cents + part, minus: cents - part };
+    addHistory(cents, p, part);
+    renderHistory();
 
     $("sumTxt").innerHTML = "<b>" + fmtCents(cents) + "</b> tutarının <b>%" + p + "</b> değeri";
     $("heroLbl").textContent = "Yüzde tutarı";
@@ -659,7 +814,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     state.amountStr = ""; state.pctStr = "";
     renderAmount(); renderPct(); go(1);
   });
-  document.querySelector(".rows").addEventListener("click", function (e) {
+  $("resRows").addEventListener("click", function (e) {
     var r = e.target.closest(".row"); if (!r || !computed) return;
     r.classList.add("flash");
     setTimeout(function () { r.classList.remove("flash"); }, 260);
@@ -667,10 +822,26 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     copyText(fmtCents(computed[r.dataset.copy]));
   });
 
+  $("histList").addEventListener("click", function (e) {
+    var r = e.target.closest(".row"); if (!r) return;
+    var h = history[parseInt(r.dataset.hist, 10)]; if (!h) return;
+    r.classList.add("flash");
+    setTimeout(function () { r.classList.remove("flash"); }, 260);
+    vibrate();
+    copyText(fmtCents(h.r));
+  });
+  $("histClear").addEventListener("click", function () {
+    history = history.slice(0, 1);   // şu anki hesap kalsın
+    saveHistory();
+    renderHistory();
+    toast("Geçmiş temizlendi");
+  });
+
   // Fiziksel klavye desteği (masaüstü / bluetooth)
   document.addEventListener("keydown", function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.key;
+    if (/^[0-9,.]$/.test(k) || k === "Backspace" || k === "Enter") tick();
     if (state.step === 1) {
       if (/^[0-9]$/.test(k)) amountKey(k);
       else if (k === "," || k === ".") amountKey(",");
@@ -685,6 +856,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }
   });
 
+  loadHistory();
   renderAmount();
   renderPct();
 })();
